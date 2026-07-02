@@ -10,11 +10,11 @@ where
 import Control.Concurrent (Chan, threadDelay, writeChan)
 import Control.Concurrent.Async (Async, async, cancel, waitCatch)
 import Control.Exception (SomeException, try)
-import Control.Monad (unless, void, when)
+import Control.Monad (void, when)
 import qualified Data.ByteString as BS
 import Data.Maybe (isNothing)
 import Data.Text.Encoding (decodeUtf8)
-import System.Exit (ExitCode (..))
+import System.Exit (ExitCode)
 import System.IO (Handle, hClose)
 import qualified System.Info
 import qualified System.Process as P
@@ -92,38 +92,27 @@ closeHandleIfOpen (Just handle) = void (try $ hClose handle :: IO (Either SomeEx
 
 stopProcessTree :: P.ProcessHandle -> Maybe String -> IO ()
 stopProcessTree processHandle maybeProcessGroupPid = do
-  isRunning <- isProcessTreeRunning processHandle maybeProcessGroupPid
-  when isRunning $ do
-    -- First ask the tree to stop, then escalate if it doesn't release resources
-    -- such as the dev server port in time.
-    interruptProcessTree processHandle maybeProcessGroupPid
-    gracefullyStopped <- waitForProcessTreeExit processHandle maybeProcessGroupPid gracefulStopTimeoutMicroseconds
-    -- The root process can exit before its descendants, so use the process
-    -- group pid captured while the root was still alive.
-    unless gracefullyStopped $ do
-      terminateProcessTree processHandle maybeProcessGroupPid
-      void $ waitForProcessTreeExit processHandle maybeProcessGroupPid hardStopTimeoutMicroseconds
-
-isProcessTreeRunning :: P.ProcessHandle -> Maybe String -> IO Bool
-isProcessTreeRunning processHandle maybeProcessGroupPid =
-  if System.Info.os == "mingw32"
-    then isProcessRunning processHandle
-    else case maybeProcessGroupPid of
-      Nothing -> isProcessRunning processHandle
-      Just processGroupPid -> isProcessGroupRunning processGroupPid
+  -- First ask the tree to stop, then escalate if it doesn't release resources
+  -- such as the dev server port in time.
+  interruptProcessTree processHandle maybeProcessGroupPid
+  void $ waitForExit processHandle gracefulStopTimeoutMicroseconds
+  -- The root process can exit before its descendants, so root exit isn't enough
+  -- proof that the server port was released.
+  terminateProcessTree processHandle maybeProcessGroupPid
+  void $ waitForExit processHandle hardStopTimeoutMicroseconds
 
 isProcessRunning :: P.ProcessHandle -> IO Bool
 isProcessRunning processHandle = do
   maybeExitCode <- P.getProcessExitCode processHandle
   return $ isNothing maybeExitCode
 
-waitForProcessTreeExit :: P.ProcessHandle -> Maybe String -> Int -> IO Bool
-waitForProcessTreeExit processHandle maybeProcessGroupPid timeoutMicroseconds = waitForExitOrTimeout timeoutMicroseconds
+waitForExit :: P.ProcessHandle -> Int -> IO Bool
+waitForExit processHandle timeoutMicroseconds = waitForExitOrTimeout timeoutMicroseconds
   where
     waitForExitOrTimeout remainingMicroseconds
       | remainingMicroseconds <= 0 = return False
       | otherwise = do
-          stillRunning <- isProcessTreeRunning processHandle maybeProcessGroupPid
+          stillRunning <- isProcessRunning processHandle
           if stillRunning
             then do
               threadDelay pollIntervalMicroseconds
@@ -133,17 +122,17 @@ waitForProcessTreeExit processHandle maybeProcessGroupPid timeoutMicroseconds = 
 interruptProcessTree :: P.ProcessHandle -> Maybe String -> IO ()
 interruptProcessTree processHandle maybeProcessGroupPid =
   if System.Info.os == "mingw32"
-    then P.terminateProcess processHandle
+    then terminateRootProcessIfRunning processHandle
     else case maybeProcessGroupPid of
-      Nothing -> P.interruptProcessGroupOf processHandle
-      Just processGroupPid -> void $ signalProcessGroup "INT" processGroupPid
+      Nothing -> void (try (P.interruptProcessGroupOf processHandle) :: IO (Either SomeException ()))
+      Just processGroupPid -> signalProcessGroup "INT" processGroupPid
 
 terminateProcessTree :: P.ProcessHandle -> Maybe String -> IO ()
 terminateProcessTree processHandle maybeProcessGroupPid =
   if System.Info.os == "mingw32"
     then terminateRootProcessIfRunning processHandle
     else do
-      void $ maybe (return False) (signalProcessGroup "KILL") maybeProcessGroupPid
+      maybe (return ()) (signalProcessGroup "KILL") maybeProcessGroupPid
       terminateRootProcessIfRunning processHandle
 
 terminateRootProcessIfRunning :: P.ProcessHandle -> IO ()
@@ -151,20 +140,16 @@ terminateRootProcessIfRunning processHandle = do
   isRunning <- isProcessRunning processHandle
   when isRunning $ P.terminateProcess processHandle
 
-isProcessGroupRunning :: String -> IO Bool
-isProcessGroupRunning = signalProcessGroup "0"
-
-signalProcessGroup :: String -> String -> IO Bool
+signalProcessGroup :: String -> String -> IO ()
 signalProcessGroup signal pid = do
   -- System.Process exposes group interrupts but not arbitrary group signals.
   signalResult <- try $ P.readCreateProcessWithExitCode (P.proc "kill" ["-" <> signal, "-" <> pid]) ""
   case signalResult :: Either SomeException (ExitCode, String, String) of
-    Left _ -> return False
-    Right (ExitSuccess, _, _) -> return True
-    Right (ExitFailure {}, _, _) -> return False
+    Left _ -> return ()
+    Right _ -> return ()
 
 gracefulStopTimeoutMicroseconds :: Int
-gracefulStopTimeoutMicroseconds = 5 * secondsInMicroseconds
+gracefulStopTimeoutMicroseconds = secondsInMicroseconds `div` 4
 
 hardStopTimeoutMicroseconds :: Int
 hardStopTimeoutMicroseconds = 5 * secondsInMicroseconds

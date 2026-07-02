@@ -571,6 +571,7 @@ test-suite waspc-tests
     base,
     containers,
     deepseq,
+    directory,
     filepath,
     hspec >=2.11,
     megaparsec,
@@ -578,6 +579,7 @@ test-suite waspc-tests
     neat-interpolation,
     parsec,
     path,
+    process,
     split,
     strong-path,
     tasty ^>=1.5.3,
@@ -614,6 +616,7 @@ test-suite waspc-tests
     Generator.MockWriteableMonad
     Generator.WriteFileDraftsTest
     JsImportTest
+    Job.Process.ManagedTest
     Node.InternalTest
     Paths_waspc
     Project.DbTest
