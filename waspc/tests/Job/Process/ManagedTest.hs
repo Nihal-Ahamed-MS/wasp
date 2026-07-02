@@ -10,38 +10,37 @@ import System.Exit (ExitCode (..))
 import System.IO (hClose, openTempFile)
 import System.Info (os)
 import qualified System.Process as P
-import Test.Hspec (Spec, describe, expectationFailure, it, pendingWith, shouldReturn, shouldSatisfy)
+import Test.Hspec (Spec, describe, expectationFailure, it, shouldReturn, shouldSatisfy)
 import qualified Wasp.Job as J
 import Wasp.Job.Process.Managed (getManagedProcessExitCode, startManagedProcess, stopManagedProcess)
 
 spec_ManagedProcess :: Spec
 spec_ManagedProcess =
-  describe "ManagedProcess" $ do
-    it "kills process-group descendants after the root process exits" $ do
-      if os == "mingw32"
-        then pendingWith "Unix process-group specific regression test"
-        else do
-          (pidFilePath, pidFileHandle) <- openTempFile "/tmp" "wasp-managed-child.pid"
-          hClose pidFileHandle
-          removeFile pidFilePath
+  if os == "mingw32"
+    then return ()
+    else describe "ManagedProcess" $ do
+      it "kills process-group descendants after the root process exits" $ do
+        (pidFilePath, pidFileHandle) <- openTempFile "/tmp" "wasp-managed-child.pid"
+        hClose pidFileHandle
+        removeFile pidFilePath
 
-          chan <- newChan
-          managedProcess <- startManagedProcess (P.proc "sh" ["-c", childProcessScript pidFilePath]) J.Server chan
-          let cleanup = stopManagedProcess managedProcess >> removeFileIfExists pidFilePath
-          ( do
-              waitUntil "child pid file" $ doesFileExist pidFilePath
-              childPid <- readFile pidFilePath
-              waitUntil "root process exit" $ isJust <$> getManagedProcessExitCode managedProcess
-              isProcessAlive childPid `shouldReturn` True
+        chan <- newChan
+        managedProcess <- startManagedProcess (P.proc "sh" ["-c", childProcessScript pidFilePath]) J.Server chan
+        let cleanup = stopManagedProcess managedProcess >> removeFileIfExists pidFilePath
+        ( do
+            waitUntil "child pid file" $ doesFileExist pidFilePath
+            childPid <- readFile pidFilePath
+            waitUntil "root process exit" $ isJust <$> getManagedProcessExitCode managedProcess
+            isProcessAlive childPid `shouldReturn` True
 
-              startedAt <- getCurrentTime
-              stopManagedProcess managedProcess
-              stoppedAt <- getCurrentTime
+            startedAt <- getCurrentTime
+            stopManagedProcess managedProcess
+            stoppedAt <- getCurrentTime
 
-              realToFrac (stoppedAt `diffUTCTime` startedAt) `shouldSatisfy` (< (2 :: Double))
-              waitUntil "child process exit" $ not <$> isProcessAlive childPid
-            )
-            `finally` cleanup
+            realToFrac (stoppedAt `diffUTCTime` startedAt) `shouldSatisfy` (< (2 :: Double))
+            waitUntil "child process exit" $ not <$> isProcessAlive childPid
+          )
+          `finally` cleanup
 
 childProcessScript :: FilePath -> String
 childProcessScript pidFilePath =
