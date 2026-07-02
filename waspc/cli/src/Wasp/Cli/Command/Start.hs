@@ -18,7 +18,7 @@ import Wasp.Cli.Command.Watch (WatchCompileHooks (..), watch)
 import Wasp.Cli.Message (cliSendMessage)
 import qualified Wasp.Cli.SignalHandling as SignalHandling
 import qualified Wasp.Generator
-import qualified Wasp.Generator.ServerGenerator.ServerProcessSupervisor as ServerProcessSupervisor
+import qualified Wasp.Generator.ServerGenerator.Start as ServerGenerator.Start
 import qualified Wasp.Message as Msg
 import Wasp.Project (CompileError, CompileWarning)
 import Wasp.Project.Common (generatedAppDirInWaspProjectDir)
@@ -57,19 +57,19 @@ start = do
     -- This way we can show newest Wasp compile warnings and errors (produced by recompilation from
     -- 'watch') once jobs from 'start' quiet down a bit.
     ongoingCompilationResultMVar <- newMVar (warnings, [])
-    serverProcessSupervisor <- ServerProcessSupervisor.newServerProcessSupervisor
+    serverProcessController <- ServerGenerator.Start.newServerProcessController
     let watchCompileHooks =
           WatchCompileHooks
             { _onSuccessfulCompile = \watchCompileResult -> do
                 let serverRuntimeInputChange = classifyServerRuntimeInputChange watchCompileResult
                 case serverRuntimeInputChange of
-                  ServerProcessSupervisor.ServerRuntimeInputMightHaveChanged -> cliSendMessage $ Msg.Start "Updating server..."
-                  ServerProcessSupervisor.NoServerRuntimeInputChange -> return ()
-                ServerProcessSupervisor.notifySuccessfulCompile serverProcessSupervisor serverRuntimeInputChange,
-              _onFailedCompile = const $ ServerProcessSupervisor.notifyFailedCompile serverProcessSupervisor
+                  ServerGenerator.Start.ServerRuntimeInputMightHaveChanged -> cliSendMessage $ Msg.Start "Updating server..."
+                  ServerGenerator.Start.NoServerRuntimeInputChange -> return ()
+                ServerGenerator.Start.notifySuccessfulCompile serverProcessController serverRuntimeInputChange,
+              _onFailedCompile = const $ ServerGenerator.Start.notifyFailedCompile serverProcessController
             }
     let watchWaspProjectSource = watch waspProjectDir outDir ongoingCompilationResultMVar watchCompileHooks
-    let startGeneratedWebApp = Wasp.Generator.start waspProjectDir outDir serverProcessSupervisor (onJobsQuietDown ongoingCompilationResultMVar)
+    let startGeneratedWebApp = Wasp.Generator.start waspProjectDir outDir serverProcessController (onJobsQuietDown ongoingCompilationResultMVar)
     -- In parallel:
     -- 1. watch for any changes in the Wasp project, be it users wasp code or users JS/HTML/...
     --    code. On any change, Wasp is recompiled (and generated app is re-generated).

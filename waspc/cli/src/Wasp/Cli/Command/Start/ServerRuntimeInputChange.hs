@@ -10,7 +10,7 @@ import Wasp.Cli.Command.Watch (ProjectFileChange (..), WatchCompileResult (..))
 import Wasp.Generator.Common (GeneratedAppDir)
 import Wasp.Generator.FileDraft.Writeable (FileOrDirPathRelativeTo)
 import qualified Wasp.Generator.ServerGenerator.Common as ServerGenerator.Common
-import Wasp.Generator.ServerGenerator.ServerProcessSupervisor
+import Wasp.Generator.ServerGenerator.Start
   ( ServerRuntimeInputChange (..),
   )
 import Wasp.Generator.WriteFileDrafts (GeneratedAppPathChange (..))
@@ -42,26 +42,20 @@ generatedPathIsServerRuntimeInput (Left file) =
 generatedPathIsServerRuntimeInput (Right dir) =
   generatedServerRuntimeInputDirGlobs `matchesAnyGlob` FP.dropTrailingPathSeparator (SP.fromRelDir dir)
 
-projectServerRuntimeInputFilePatterns :: [String]
-projectServerRuntimeInputFilePatterns =
-  recursiveFileGlobsWithExtensions projectSrcDir serverRuntimeInputFileExtensions
-
-generatedServerRuntimeInputFilePatterns :: [String]
-generatedServerRuntimeInputFilePatterns =
-  generatedServerEnvFile
-    : recursiveFileGlobsWithExtensions generatedServerSrcDir serverRuntimeInputFileExtensions
-
-generatedServerRuntimeInputDirPatterns :: [String]
-generatedServerRuntimeInputDirPatterns = dirAndDescendantsGlobs generatedServerSrcDir
-
 projectServerRuntimeInputFileGlobs :: GlobPatterns
-projectServerRuntimeInputFileGlobs = compileGlobPatterns projectServerRuntimeInputFilePatterns
+projectServerRuntimeInputFileGlobs =
+  compileGlobPatterns $
+    recursiveFileGlobsWithExtensions projectSrcDir serverRuntimeInputFileExtensions
 
 generatedServerRuntimeInputFileGlobs :: GlobPatterns
-generatedServerRuntimeInputFileGlobs = compileGlobPatterns generatedServerRuntimeInputFilePatterns
+generatedServerRuntimeInputFileGlobs =
+  compileGlobPatterns $
+    generatedServerEnvFile
+      : recursiveFileGlobsWithExtensions generatedServerSrcDir serverRuntimeInputFileExtensions
 
 generatedServerRuntimeInputDirGlobs :: GlobPatterns
-generatedServerRuntimeInputDirGlobs = compileGlobPatterns generatedServerRuntimeInputDirPatterns
+generatedServerRuntimeInputDirGlobs =
+  compileGlobPatterns $ dirAndDescendantsGlobs generatedServerSrcDir
 
 projectSrcDir :: FilePath
 projectSrcDir = FP.dropTrailingPathSeparator $ SP.fromRelDir srcDirInWaspProjectDir

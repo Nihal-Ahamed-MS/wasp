@@ -10,13 +10,13 @@ where
 import qualified System.FilePath as FP
 import qualified System.FilePath.Glob as Glob
 
-newtype GlobPatterns = GlobPatterns [Glob.Pattern]
+type GlobPatterns = [Glob.Pattern]
 
 compileGlobPatterns :: [String] -> GlobPatterns
-compileGlobPatterns = GlobPatterns . map Glob.compile
+compileGlobPatterns = map Glob.compile
 
 matchesAnyGlob :: GlobPatterns -> FilePath -> Bool
-matchesAnyGlob (GlobPatterns patterns) path = any (`Glob.match` path) patterns
+matchesAnyGlob patterns path = any (`Glob.match` path) patterns
 
 recursiveFileGlobsWithExtensions :: FilePath -> [String] -> [String]
 recursiveFileGlobsWithExtensions dir extensions =
@@ -25,5 +25,5 @@ recursiveFileGlobsWithExtensions dir extensions =
 dirAndDescendantsGlobs :: FilePath -> [String]
 dirAndDescendantsGlobs dir =
   [ dir,
-    dir FP.</> "**"
+    dir FP.</> "**" FP.</> "*"
   ]

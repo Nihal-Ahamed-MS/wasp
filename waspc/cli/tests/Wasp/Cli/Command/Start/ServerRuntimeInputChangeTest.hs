@@ -5,7 +5,7 @@ import Test.Hspec (Spec, describe, it, shouldBe)
 import Wasp.Cli.Command.Compile (CompileResult (..))
 import Wasp.Cli.Command.Start.ServerRuntimeInputChange (classifyServerRuntimeInputChange)
 import Wasp.Cli.Command.Watch (ProjectFileChange (..), WatchCompileResult (..))
-import Wasp.Generator.ServerGenerator.ServerProcessSupervisor (ServerRuntimeInputChange (..))
+import Wasp.Generator.ServerGenerator.Start (ServerRuntimeInputChange (..))
 import Wasp.Generator.WriteFileDrafts (GeneratedAppPathChange (..))
 
 spec_classifyServerRuntimeInputChange :: Spec

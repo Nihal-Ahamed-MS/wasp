@@ -2,7 +2,6 @@
 
 module Wasp.Cli.Command.Compile
   ( CompileResult (..),
-    compileResultWarningsAndErrors,
     compileIO,
     compile,
     compileWithOptions,
@@ -30,7 +29,7 @@ import Wasp.CompileOptions (CompileOptions (..))
 import qualified Wasp.Generator
 import qualified Wasp.Generator.WaspInfo as WaspInfo
 import qualified Wasp.Message as Msg
-import Wasp.Project (CompileError, CompileResult (..), CompileWarning, WaspProjectDir)
+import Wasp.Project (CompileError, CompileResult (..), CompileWarning, WaspProjectDir, compileResultWarningsAndErrors)
 import qualified Wasp.Project
 import qualified Wasp.Project.BuildType as BuildType
 import Wasp.Project.Common (generatedAppDirInWaspProjectDir)
@@ -135,9 +134,6 @@ compileIOWithOptions ::
   IO CompileResult
 compileIOWithOptions options waspProjectDir outDir =
   Wasp.Project.compile waspProjectDir outDir options
-
-compileResultWarningsAndErrors :: CompileResult -> ([CompileWarning], [CompileError])
-compileResultWarningsAndErrors = Wasp.Project.compileResultWarningsAndErrors
 
 defaultCompileOptions :: Path' Abs (Dir WaspProjectDir) -> CompileOptions
 defaultCompileOptions waspProjectDir =
