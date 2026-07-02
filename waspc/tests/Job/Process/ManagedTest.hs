@@ -7,8 +7,8 @@ import Data.Maybe (isJust)
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
 import System.Directory (doesFileExist, removeFile)
 import System.Exit (ExitCode (..))
-import System.Info (os)
 import System.IO (hClose, openTempFile)
+import System.Info (os)
 import qualified System.Process as P
 import Test.Hspec (Spec, describe, expectationFailure, it, pendingWith, shouldReturn, shouldSatisfy)
 import qualified Wasp.Job as J
