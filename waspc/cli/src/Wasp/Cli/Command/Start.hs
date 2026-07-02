@@ -5,6 +5,7 @@ where
 
 import Control.Concurrent.Async (race)
 import Control.Concurrent.MVar (MVar, newMVar, tryTakeMVar)
+import Control.Monad (when)
 import Control.Monad.Except (throwError)
 import Control.Monad.IO.Class (liftIO)
 import StrongPath ((</>))
@@ -62,9 +63,9 @@ start = do
           WatchCompileHooks
             { _onSuccessfulCompile = \watchCompileResult -> do
                 let serverRuntimeInputChange = classifyServerRuntimeInputChange watchCompileResult
-                case serverRuntimeInputChange of
-                  ServerGenerator.Start.ServerRuntimeInputMightHaveChanged -> cliSendMessage $ Msg.Start "Updating server..."
-                  ServerGenerator.Start.NoServerRuntimeInputChange -> return ()
+                when (serverRuntimeInputChange == ServerGenerator.Start.ServerRuntimeInputMightHaveChanged) $
+                  cliSendMessage $
+                    Msg.Start "Updating server..."
                 ServerGenerator.Start.notifySuccessfulCompile serverProcessController serverRuntimeInputChange,
               _onFailedCompile = const $ ServerGenerator.Start.notifyFailedCompile serverProcessController
             }
